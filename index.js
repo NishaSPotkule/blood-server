@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const express = require("express");
 const admin = require("firebase-admin");
 const cors = require("cors");
@@ -6,17 +8,19 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-
 const serviceAccount = JSON.parse(process.env.FIREBASE_KEY);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
 
-
 app.post("/sendRequest", async (req, res) => {
 
-  const { token, bloodGroup } = req.body;
+  const { tokens, bloodGroup } = req.body;
+
+  if (!tokens || tokens.length === 0) {
+    return res.status(400).send({ success: false, message: "No tokens" });
+  }
 
   try {
     const message = {
@@ -24,17 +28,21 @@ app.post("/sendRequest", async (req, res) => {
         title: "🚨 Blood Request",
         body: `Urgent need for ${bloodGroup} donor nearby!`
       },
-      token: token
+      tokens: tokens
     };
 
-    await admin.messaging().send(message);
+    const response = await admin.messaging().sendMulticast(message);
 
-    res.send({ success: true });
+    res.send({ success: true, response });
 
   } catch (error) {
     console.log(error);
-    res.send({ success: false });
+    res.status(500).send({ success: false });
   }
 });
 
-app.listen(3000, () => console.log("Server running on port 3000"));
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("Server running on port " + PORT);
+});
